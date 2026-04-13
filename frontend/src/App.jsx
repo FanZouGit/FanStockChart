@@ -206,6 +206,9 @@ function CandleCanvas({ candles, indicators, patterns, onHover }) {
       if (patterns.some(p => p.type === "bear")) { ctx.fillStyle = DN; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.fillText("▼", xo(n - 1), yo(candles[n - 1].h) + 14); }
     }
 
+    if (ctx?.canvas) {
+      ctx.canvas._chart = { xo, yo, cw, PL, PR, PT, PB, yMn, yMx };
+    }
     return { xo, yo, cw, PL, PR, PT, PB, yMn, yMx };
   }
 
