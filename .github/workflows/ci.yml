@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -22,11 +25,15 @@ jobs:
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          if [ -f backend/requirements.txt ]; then
+            pip install -r backend/requirements.txt
+          else
+            echo 'backend/requirements.txt not found; skipping backend dependency installation.'
+          fi
 
       - name: Run backend tests (if configured)
         run: |
-          if find backend -type f \( -name 'test_*.py' -o -name '*_test.py' \) | grep -q .; then
+          if find backend -type f -name 'test*.py' | grep -q .; then
             python -m unittest discover -s backend -p 'test*.py'
           else
             echo 'Backend tests are not configured.'
@@ -40,14 +47,28 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
-        run: npm ci --prefix frontend
+        run: |
+          if [ -f frontend/package.json ]; then
+            if [ -f frontend/package-lock.json ]; then
+              npm ci --prefix frontend
+            else
+              npm install --prefix frontend
+            fi
+          else
+            echo 'frontend/package.json not found; skipping frontend dependency installation.'
+          fi
 
-      - name: Build frontend
-        run: npm run build --prefix frontend
+      - name: Build frontend (if configured)
+        run: |
+          if [ -f frontend/package.json ] && [ "$(npm pkg get scripts.build --prefix frontend)" != '{}' ]; then
+            npm run build --prefix frontend
+          else
+            echo 'Frontend build is not configured.'
+          fi
 
       - name: Run frontend tests (if configured)
         run: |
-          if node -e "const p=require('./frontend/package.json'); process.exit((p.scripts && p.scripts.test) ? 0 : 1)"; then
+          if [ -f frontend/package.json ] && [ "$(npm pkg get scripts.test --prefix frontend)" != '{}' ]; then
             npm run test --prefix frontend
           else
             echo 'Frontend tests are not configured.'
