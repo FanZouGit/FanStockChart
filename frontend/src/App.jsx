@@ -139,7 +139,8 @@ function CandleCanvas({ candles, indicators, patterns, onHover }) {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = w * dpr; canvas.height = h * dpr;
     const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
-    drawCandles(ctx, w, h, candles, indicators, patterns);
+    const chartMeta = drawCandles(ctx, w, h, candles, indicators, patterns);
+    if (chartMeta) canvas._chart = chartMeta;
   }, [candles, indicators, patterns]);
 
   function drawCandles(ctx, W, H, candles, indicators, patterns) {
@@ -208,6 +209,7 @@ function CandleCanvas({ candles, indicators, patterns, onHover }) {
     if (ctx?.canvas) {
       ctx.canvas._chart = { xo, yo, cw, PL, PR, PT, PB, yMn, yMx };
     }
+    return { xo, yo, cw, PL, PR, PT, PB, yMn, yMx };
   }
 
   function handleMouseMove(e) {
