@@ -10,10 +10,24 @@ from typing import Optional, List
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, date, timedelta
+from pathlib import Path
 import json
+import uuid
 
 app = FastAPI(title="Stock Chart Pro API", version="1.0.0")
+
+# ── Portfolio persistence ─────────────────────────────────────────────────────
+
+PORTFOLIO_FILE = Path(__file__).parent / "portfolio.json"
+
+def _load_orders() -> list:
+    if not PORTFOLIO_FILE.exists():
+        return []
+    return json.loads(PORTFOLIO_FILE.read_text())
+
+def _save_orders(orders: list):
+    PORTFOLIO_FILE.write_text(json.dumps(orders, indent=2))
 
 app.add_middleware(
     CORSMiddleware,
@@ -289,6 +303,70 @@ def get_quote(symbol: str = Query(...)):
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "1.0.0"}
+
+
+# ── Portfolio endpoints ───────────────────────────────────────────────────────
+
+@app.get("/orders")
+def get_orders():
+    return _load_orders()
+
+
+@app.post("/orders")
+def add_order(
+    symbol: str = Query(...),
+    buy_date: str = Query(...),
+    buy_price: float = Query(...),
+    shares: float = Query(...),
+):
+    orders = _load_orders()
+    order = {
+        "id": str(uuid.uuid4()),
+        "symbol": symbol.upper(),
+        "buy_date": buy_date,
+        "buy_price": round(buy_price, 4),
+        "shares": shares,
+    }
+    orders.append(order)
+    _save_orders(orders)
+    return order
+
+
+@app.delete("/orders/{order_id}")
+def delete_order(order_id: str):
+    orders = [o for o in _load_orders() if o["id"] != order_id]
+    _save_orders(orders)
+    return {"ok": True}
+
+
+@app.get("/gain-loss")
+def gain_loss(
+    id: str = Query(...),
+    eval_date: str = Query(None),
+):
+    orders = _load_orders()
+    order = next((o for o in orders if o["id"] == id), None)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    sym = order["symbol"]
+    ticker = yf.Ticker(sym)
+    if eval_date:
+        end = (date.fromisoformat(eval_date) + timedelta(days=5)).isoformat()
+        hist = ticker.history(start=eval_date, end=end)
+        if hist.empty:
+            raise HTTPException(status_code=400, detail=f"No price data for {sym} at {eval_date}")
+        eval_price = round(float(hist["Close"].iloc[0]), 4)
+    else:
+        eval_price = round(float(ticker.fast_info.last_price), 4)
+    bp, shares = order["buy_price"], order["shares"]
+    gl_dollar = round((eval_price - bp) * shares, 2)
+    gl_pct = round((eval_price - bp) / bp * 100, 2)
+    return {
+        "eval_price": eval_price,
+        "gain_loss_dollar": gl_dollar,
+        "gain_loss_pct": gl_pct,
+        "total_value": round(eval_price * shares, 2),
+    }
 
 
 if __name__ == "__main__":

@@ -128,7 +128,7 @@ function useCanvas(drawFn, deps) {
   return ref;
 }
 
-function CandleCanvas({ candles, indicators, patterns, onHover }) {
+function CandleCanvas({ candles, indicators, patterns, onHover, onCandleClick, buyPickMode }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -212,20 +212,36 @@ function CandleCanvas({ candles, indicators, patterns, onHover }) {
     return { xo, yo, cw, PL, PR, PT, PB, yMn, yMx };
   }
 
-  function handleMouseMove(e) {
-    if (!canvasRef.current || !candles.length) return;
+  function getIdxFromEvent(e) {
+    if (!canvasRef.current || !candles.length) return -1;
     const rect = canvasRef.current.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const W = canvasRef.current.offsetWidth;
     const PL = 56, PR = 12, CW = W - PL - PR, n = candles.length, cw = CW / n;
-    const idx = Math.round((mx - PL) / cw - 0.5);
-    if (idx >= 0 && idx < n) onHover(candles[idx], idx);
+    return Math.round((mx - PL) / cw - 0.5);
+  }
+
+  function handleMouseMove(e) {
+    const idx = getIdxFromEvent(e);
+    if (idx >= 0 && idx < candles.length) onHover(candles[idx], idx);
+  }
+
+  function handleClick(e) {
+    if (!onCandleClick) return;
+    const idx = getIdxFromEvent(e);
+    if (idx >= 0 && idx < candles.length) onCandleClick(candles[idx]);
   }
 
   return (
     <div ref={containerRef} style={{ position: "relative", width: "100%", height: 300 }}>
-      <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
-        onMouseMove={handleMouseMove} onMouseLeave={() => onHover(null)} />
+      {buyPickMode && (
+        <div style={{ position: "absolute", top: 6, left: 60, zIndex: 10, background: "rgba(42,34,0,0.92)", border: "1px solid #8a6a00", borderRadius: 5, padding: "4px 10px", color: "#f0c040", fontSize: 10, pointerEvents: "none" }}>
+          Click a candle to set buy date &amp; price
+        </div>
+      )}
+      <canvas ref={canvasRef}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", cursor: buyPickMode ? "crosshair" : "default" }}
+        onMouseMove={handleMouseMove} onMouseLeave={() => onHover(null)} onClick={handleClick} />
     </div>
   );
 }
@@ -327,6 +343,13 @@ export default function App() {
   const [cmpData, setCmpData] = useState({});
   const [cmpLoading, setCmpLoading] = useState(false);
 
+  // Portfolio state
+  const [orders, setOrders] = useState([]);
+  const [portfolioForm, setPortfolioForm] = useState({ symbol: "", buy_date: "", buy_price: "", shares: "" });
+  const [evalDate, setEvalDate] = useState("");
+  const [gainLoss, setGainLoss] = useState({});
+  const [buyPickMode, setBuyPickMode] = useState(false);
+
   const fetchCandles = useCallback(async (s, r) => {
     const res = await fetch(`${API_BASE}/candles?symbol=${s}&range=${r}`);
     if (!res.ok) throw new Error("Symbol not found");
@@ -387,6 +410,44 @@ export default function App() {
 
   useEffect(() => { if (tab === "compare") loadCompare(); }, [tab, cmpRange, cmpSyms]);
 
+  const fetchOrders = useCallback(async () => {
+    const res = await fetch(`${API_BASE}/orders`);
+    const data = await res.json();
+    setOrders(data);
+    return data;
+  }, []);
+
+  const fetchGainLoss = useCallback(async (orderList, ed) => {
+    const results = {};
+    await Promise.all(orderList.map(async (o) => {
+      const params = ed ? `?id=${o.id}&eval_date=${ed}` : `?id=${o.id}`;
+      const res = await fetch(`${API_BASE}/gain-loss${params}`);
+      if (res.ok) results[o.id] = await res.json();
+    }));
+    setGainLoss(results);
+  }, []);
+
+  const addOrder = useCallback(async () => {
+    const { symbol, buy_date, buy_price, shares } = portfolioForm;
+    if (!symbol || !buy_date || !buy_price || !shares) return;
+    await fetch(`${API_BASE}/orders?symbol=${symbol}&buy_date=${buy_date}&buy_price=${buy_price}&shares=${shares}`, { method: "POST" });
+    const updated = await fetchOrders();
+    fetchGainLoss(updated, evalDate);
+    setPortfolioForm({ symbol: "", buy_date: "", buy_price: "", shares: "" });
+  }, [portfolioForm, evalDate, fetchOrders, fetchGainLoss]);
+
+  const deleteOrder = useCallback(async (id) => {
+    await fetch(`${API_BASE}/orders/${id}`, { method: "DELETE" });
+    const updated = await fetchOrders();
+    fetchGainLoss(updated, evalDate);
+  }, [evalDate, fetchOrders, fetchGainLoss]);
+
+  useEffect(() => {
+    if (tab === "portfolio") {
+      fetchOrders().then(list => fetchGainLoss(list, evalDate));
+    }
+  }, [tab]);
+
   const last = candles.length ? candles[candles.length - 1] : null;
   const first = candles.length ? candles[0] : null;
   const chg = last && first ? last.c - first.o : 0;
@@ -406,8 +467,8 @@ export default function App() {
     <div style={{ fontFamily: "monospace", maxWidth: 1000, margin: "0 auto", border: "1px solid #e0e0e0", borderRadius: 8, overflow: "hidden", background: "#fff" }}>
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid #e0e0e0" }}>
-        {["chart", "alerts", "compare"].map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ padding: "10px 18px", fontSize: 12, border: "none", borderBottom: tab === t ? "2px solid #222" : "2px solid transparent", background: "transparent", color: tab === t ? "#222" : "#888", cursor: "pointer", textTransform: "capitalize" }}>{t}</button>
+        {["chart", "alerts", "compare", "portfolio"].map(t => (
+          <button key={t} onClick={() => { setTab(t); if (t !== "chart") setBuyPickMode(false); }} style={{ padding: "10px 18px", fontSize: 12, border: "none", borderBottom: tab === t ? "2px solid #222" : "2px solid transparent", background: "transparent", color: tab === t ? "#222" : "#888", cursor: "pointer", textTransform: "capitalize" }}>{t}</button>
         ))}
       </div>
 
@@ -449,7 +510,16 @@ export default function App() {
               )}
               <div style={{ fontSize: 9, color: "#aaa", padding: "2px 12px" }}>{status}</div>
 
-              <CandleCanvas candles={candles} indicators={indicators} patterns={patterns} onHover={setHoverCandle} />
+              <CandleCanvas candles={candles} indicators={indicators} patterns={patterns} onHover={setHoverCandle}
+                buyPickMode={buyPickMode}
+                onCandleClick={buyPickMode ? (c) => {
+                  const d = new Date(c.t);
+                  const dateStr = d.toISOString().split("T")[0];
+                  setPortfolioForm(f => ({ ...f, buy_date: dateStr, buy_price: c.c.toFixed(2) }));
+                  setBuyPickMode(false);
+                  setTab("portfolio");
+                } : null}
+              />
 
               {/* Patterns */}
               {indicators.pat && (
@@ -519,6 +589,127 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Portfolio Tab */}
+      {tab === "portfolio" && (() => {
+        const totalInvested = orders.reduce((sum, o) => sum + o.buy_price * o.shares, 0);
+        const totalValue = orders.reduce((sum, o) => sum + (gainLoss[o.id]?.total_value ?? o.buy_price * o.shares), 0);
+        const totalGL = totalValue - totalInvested;
+        const totalGLPct = totalInvested > 0 ? (totalGL / totalInvested) * 100 : 0;
+        return (
+          <div style={{ padding: 16 }}>
+            {/* Hint banner */}
+            <div style={{ background: "rgba(29,158,117,0.07)", border: "1px solid rgba(29,158,117,0.25)", borderRadius: 6, padding: "8px 12px", color: UP, fontSize: 10, marginBottom: 14 }}>
+              Tip: Go to the Chart tab and click "Pick from Chart" to auto-fill the buy date &amp; price from any candle.
+            </div>
+
+            {/* Add Order form */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#aaa", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>Add Buy Order</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+                {[
+                  { label: "Symbol", key: "symbol", w: 80, placeholder: "AAPL" },
+                  { label: "Buy Date", key: "buy_date", w: 140, type: "date" },
+                  { label: "Price / Share ($)", key: "buy_price", w: 110, type: "number", placeholder: "0.00" },
+                  { label: "Shares", key: "shares", w: 80, type: "number", placeholder: "0" },
+                ].map(({ label, key, w, type, placeholder }) => (
+                  <div key={key} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <label style={{ fontSize: 9, color: "#999", textTransform: "uppercase", letterSpacing: ".05em" }}>{label}</label>
+                    <input
+                      type={type || "text"}
+                      placeholder={placeholder}
+                      value={portfolioForm[key]}
+                      onChange={e => setPortfolioForm(f => ({ ...f, [key]: key === "symbol" ? e.target.value.toUpperCase() : e.target.value }))}
+                      style={{ width: w, fontSize: 11, padding: "5px 8px", border: "1px solid #ddd", borderRadius: 5, fontFamily: "monospace" }}
+                    />
+                  </div>
+                ))}
+                <button onClick={() => { setBuyPickMode(true); setTab("chart"); }}
+                  style={{ fontSize: 10, padding: "5px 10px", border: "1px solid #185FA5", borderRadius: 5, background: "#eef4ff", color: "#185FA5", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  🖱 Pick from Chart
+                </button>
+                <button onClick={addOrder}
+                  style={{ fontSize: 11, padding: "5px 14px", border: "none", borderRadius: 5, background: "#222", color: "#fff", cursor: "pointer", fontWeight: 600 }}>
+                  + Add Order
+                </button>
+              </div>
+            </div>
+
+            {/* Summary cards */}
+            {orders.length > 0 && (
+              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+                {[
+                  { label: "Total Invested", value: `$${totalInvested.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "#888" },
+                  { label: "Current Value", value: `$${totalValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, color: "#185FA5" },
+                  { label: "Total Gain / Loss", value: `${totalGL >= 0 ? "+" : ""}$${totalGL.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${totalGLPct >= 0 ? "+" : ""}${totalGLPct.toFixed(2)}%)`, color: totalGL >= 0 ? UP : DN },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ flex: 1, border: "1px solid #eee", borderRadius: 8, padding: "10px 14px" }}>
+                    <div style={{ fontSize: 9, color: "#aaa", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Orders table */}
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#aaa", textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>My Orders</div>
+            {orders.length === 0
+              ? <div style={{ fontSize: 12, color: "#bbb" }}>No orders yet. Add one above.</div>
+              : (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 10, color: "#888" }}>Evaluate at:</span>
+                    <input type="date" value={evalDate}
+                      onChange={e => { setEvalDate(e.target.value); fetchGainLoss(orders, e.target.value); }}
+                      style={{ fontSize: 10, padding: "3px 7px", border: "1px solid #ddd", borderRadius: 5, fontFamily: "monospace" }} />
+                    <span style={{ fontSize: 9, color: "#bbb" }}>{evalDate ? "" : "(today's live price)"}</span>
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid #eee" }}>
+                        {["Symbol", "Buy Date", "Buy Price", "Shares", "Eval Price", "Gain / Loss $", "Gain / Loss %", ""].map(h => (
+                          <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 9, color: "#bbb", textTransform: "uppercase", letterSpacing: ".05em", fontWeight: 600 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.map(o => {
+                        const gl = gainLoss[o.id];
+                        const glDollar = gl?.gain_loss_dollar;
+                        const glPct = gl?.gain_loss_pct;
+                        const evalPrice = gl?.eval_price;
+                        const isGain = glDollar != null && glDollar >= 0;
+                        return (
+                          <tr key={o.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                            <td style={{ padding: "8px 8px", fontWeight: 700 }}>{o.symbol}</td>
+                            <td style={{ padding: "8px 8px", color: "#999" }}>{o.buy_date}</td>
+                            <td style={{ padding: "8px 8px" }}>${o.buy_price.toFixed(2)}</td>
+                            <td style={{ padding: "8px 8px" }}>{o.shares}</td>
+                            <td style={{ padding: "8px 8px" }}>{evalPrice != null ? `$${evalPrice.toFixed(2)}` : "…"}</td>
+                            <td style={{ padding: "8px 8px", fontWeight: 600, color: glDollar == null ? "#aaa" : isGain ? UP : DN }}>
+                              {glDollar == null ? "…" : `${isGain ? "+" : ""}$${Math.abs(glDollar).toFixed(2)}`}
+                            </td>
+                            <td style={{ padding: "8px 8px" }}>
+                              {glPct == null ? "…" : (
+                                <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, fontWeight: 700, background: isGain ? "rgba(29,158,117,0.1)" : "rgba(216,90,48,0.1)", color: isGain ? UP : DN }}>
+                                  {isGain ? "+" : ""}{glPct.toFixed(2)}%
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: "8px 4px" }}>
+                              <span onClick={() => deleteOrder(o.id)} style={{ cursor: "pointer", color: "#ccc", fontSize: 14 }}>×</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </>
+              )
+            }
+          </div>
+        );
+      })()}
 
       {/* Compare Tab */}
       {tab === "compare" && (

@@ -1,0 +1,37 @@
+[
+  {
+    "id": "ef2f1d36-342c-4597-bc9c-f7765c2e3ff5",
+    "symbol": "SPY",
+    "buy_date": "2024-01-02",
+    "buy_price": 476.0,
+    "shares": 5.0
+  },
+  {
+    "id": "edccb9d1-28d5-4dda-ae04-6476e8076968",
+    "symbol": "AAPL",
+    "buy_date": "2024-06-01",
+    "buy_price": 194.0,
+    "shares": 10.0
+  },
+  {
+    "id": "8f313406-fba8-440e-834e-2f7a67b6953b",
+    "symbol": "DFEN",
+    "buy_date": "2026-03-30",
+    "buy_price": 56.75,
+    "shares": 100.0
+  },
+  {
+    "id": "25db0736-ed76-46f1-8fea-0f927d771c6a",
+    "symbol": "AMZN",
+    "buy_date": "2026-04-02",
+    "buy_price": 209.77,
+    "shares": 200.0
+  },
+  {
+    "id": "2696b9a0-8bb9-46d9-8153-802fbf93f696",
+    "symbol": "GLD",
+    "buy_date": "2026-04-17",
+    "buy_price": 445.93,
+    "shares": 100.0
+  }
+]
