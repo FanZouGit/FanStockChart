@@ -253,7 +253,7 @@ def compare_symbols(
     symbols: str = Query(..., description="Comma-separated symbols e.g. AAPL,MSFT,NVDA"),
     range: str = Query("1y"),
 ):
-    interval_map = {"3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
+    interval_map = {"1d": "5m", "5d": "15m", "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
     bar_interval = interval_map.get(range, "1d")
     sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()][:8]
 
