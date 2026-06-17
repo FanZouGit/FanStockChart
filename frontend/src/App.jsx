@@ -131,6 +131,7 @@ function useCanvas(drawFn, deps) {
 function CandleCanvas({ candles, indicators, patterns, onHover, onCandleClick, buyPickMode }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
+  const crosshairRef = useRef(null);
 
   useEffect(() => {
     if (!canvasRef.current || !candles.length) return;
@@ -221,9 +222,29 @@ function CandleCanvas({ candles, indicators, patterns, onHover, onCandleClick, b
     return Math.round((mx - PL) / cw - 0.5);
   }
 
+  function drawCrosshair(idx) {
+    const overlay = crosshairRef.current, chart = canvasRef.current?._chart;
+    if (!overlay || !chart) return;
+    const w = overlay.offsetWidth, h = overlay.offsetHeight, dpr = window.devicePixelRatio || 1;
+    if (overlay.width !== w * dpr || overlay.height !== h * dpr) { overlay.width = w * dpr; overlay.height = h * dpr; }
+    const ctx = overlay.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (idx < 0 || idx >= candles.length) return;
+    const x = chart.xo(idx);
+    ctx.strokeStyle = "rgba(120,120,120,0.6)"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(x, chart.PT); ctx.lineTo(x, h - chart.PB); ctx.stroke(); ctx.setLineDash([]);
+  }
+
   function handleMouseMove(e) {
     const idx = getIdxFromEvent(e);
+    drawCrosshair(idx);
     if (idx >= 0 && idx < candles.length) onHover(candles[idx], idx);
+  }
+
+  function handleMouseLeave() {
+    drawCrosshair(-1);
+    onHover(null);
   }
 
   function handleClick(e) {
@@ -241,7 +262,9 @@ function CandleCanvas({ candles, indicators, patterns, onHover, onCandleClick, b
       )}
       <canvas ref={canvasRef}
         style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", cursor: buyPickMode ? "crosshair" : "default" }}
-        onMouseMove={handleMouseMove} onMouseLeave={() => onHover(null)} onClick={handleClick} />
+        onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave} onClick={handleClick} />
+      <canvas ref={crosshairRef}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none" }} />
     </div>
   );
 }
