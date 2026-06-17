@@ -222,7 +222,7 @@ function CandleCanvas({ candles, indicators, patterns, onHover, onCandleClick, b
     return Math.round((mx - PL) / cw - 0.5);
   }
 
-  function drawCrosshair(idx) {
+  function drawCrosshair(idx, my) {
     const overlay = crosshairRef.current, chart = canvasRef.current?._chart;
     if (!overlay || !chart) return;
     const w = overlay.offsetWidth, h = overlay.offsetHeight, dpr = window.devicePixelRatio || 1;
@@ -231,14 +231,29 @@ function CandleCanvas({ candles, indicators, patterns, onHover, onCandleClick, b
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     if (idx < 0 || idx >= candles.length) return;
-    const x = chart.xo(idx);
+    const x = chart.xo(idx), top = chart.PT, bot = h - chart.PB;
     ctx.strokeStyle = "rgba(120,120,120,0.6)"; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
-    ctx.beginPath(); ctx.moveTo(x, chart.PT); ctx.lineTo(x, h - chart.PB); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, bot); ctx.stroke();
+    if (my != null && my >= top && my <= bot) {
+      ctx.beginPath(); ctx.moveTo(chart.PL, my); ctx.lineTo(w - chart.PR, my); ctx.stroke();
+      const price = chart.yMx - (my - top) / (bot - top) * (chart.yMx - chart.yMn);
+      const label = price.toFixed(2);
+      ctx.font = "10px monospace"; const tw = ctx.measureText(label).width;
+      ctx.fillStyle = "#2a2a2a"; ctx.fillRect(chart.PL - tw - 8, my - 7, tw + 6, 14);
+      ctx.fillStyle = "#fff"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.fillText(label, chart.PL - 4, my);
+    }
+    ctx.setLineDash([]);
+  }
+
+  function getYFromEvent(e) {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return e.clientY - rect.top;
   }
 
   function handleMouseMove(e) {
     const idx = getIdxFromEvent(e);
-    drawCrosshair(idx);
+    drawCrosshair(idx, getYFromEvent(e));
     if (idx >= 0 && idx < candles.length) onHover(candles[idx], idx);
   }
 
