@@ -326,9 +326,9 @@ function MACDCanvas({ candles }) {
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab] = useState("chart");
-  const [sym, setSym] = useState("SPY");
-  const [inputSym, setInputSym] = useState("SPY");
-  const [range, setRange] = useState("3mo");
+  const [sym, setSym] = useState(() => localStorage.getItem("fsc.sym") || "SPY");
+  const [inputSym, setInputSym] = useState(() => localStorage.getItem("fsc.sym") || "SPY");
+  const [range, setRange] = useState(() => localStorage.getItem("fsc.range") || "3mo");
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Enter symbol and click Load");
@@ -357,6 +357,8 @@ export default function App() {
   }, []);
 
   const load = useCallback(async (s = sym, r = range) => {
+    localStorage.setItem("fsc.sym", s);
+    localStorage.setItem("fsc.range", r);
     setLoading(true); setStatus("Fetching...");
     try {
       const data = await fetchCandles(s, r);
@@ -369,7 +371,7 @@ export default function App() {
     setLoading(false);
   }, [sym, range, fetchCandles]);
 
-  useEffect(() => { load("SPY", "3mo"); }, []);
+  useEffect(() => { load(sym, range); }, []);
 
   const checkAlerts = (s, cs) => {
     if (!cs.length) return;
