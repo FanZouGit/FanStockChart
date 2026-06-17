@@ -148,10 +148,10 @@ def detect_patterns(df: pd.DataFrame) -> list:
 @app.get("/candles")
 def get_candles(
     symbol: str = Query(..., description="Ticker symbol e.g. AAPL"),
-    range: str = Query("3mo", description="Range: 5d, 1mo, 3mo, 6mo, 1y, 2y"),
+    range: str = Query("3mo", description="Range: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y"),
     interval: str = Query("1d", description="Bar interval: 15m, 1h, 1d, 1wk"),
 ):
-    interval_map = {"5d": "15m", "1mo": "1d", "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
+    interval_map = {"1d": "5m", "5d": "15m", "1mo": "1d", "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
     bar_interval = interval_map.get(range, "1d")
 
     try:
@@ -189,7 +189,7 @@ def get_indicators(
     symbol: str = Query(...),
     range: str = Query("3mo"),
 ):
-    interval_map = {"5d": "15m", "1mo": "1d", "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
+    interval_map = {"1d": "5m", "5d": "15m", "1mo": "1d", "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
     bar_interval = interval_map.get(range, "1d")
 
     try:
@@ -224,7 +224,7 @@ def get_patterns(
     symbol: str = Query(...),
     range: str = Query("3mo"),
 ):
-    interval_map = {"5d": "15m", "1mo": "1d", "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
+    interval_map = {"1d": "5m", "5d": "15m", "1mo": "1d", "3mo": "1d", "6mo": "1d", "1y": "1d", "2y": "1wk"}
     bar_interval = interval_map.get(range, "1d")
 
     try:

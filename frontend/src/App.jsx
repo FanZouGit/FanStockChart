@@ -481,7 +481,7 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 12px", borderBottom: "1px solid #f0f0f0", flexWrap: "wrap" }}>
             <input value={inputSym} onChange={e => setInputSym(e.target.value.toUpperCase())} onKeyDown={e => e.key === "Enter" && (setSym(inputSym), load(inputSym, range))}
               style={{ width: 70, fontSize: 12, fontWeight: 600, padding: "4px 7px", border: "1px solid #ddd", borderRadius: 6, fontFamily: "monospace", textTransform: "uppercase" }} />
-            {["5d","1mo","3mo","6mo","1y","2y"].map(r => (
+            {["1d","5d","1mo","3mo","6mo","1y","2y"].map(r => (
               <button key={r} onClick={() => { setRange(r); load(sym, r); }}
                 style={{ fontSize: 10, padding: "3px 8px", border: "1px solid #ddd", borderRadius: 6, background: range === r ? "#f0f0f0" : "transparent", color: range === r ? "#222" : "#888", cursor: "pointer" }}>{r.toUpperCase()}</button>
             ))}
