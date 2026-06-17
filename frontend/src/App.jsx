@@ -375,7 +375,10 @@ export default function App() {
   const [hoverCandle, setHoverCandle] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [alertForm, setAlertForm] = useState({ sym: "", cond: "above", val: "" });
-  const [cmpSyms, setCmpSyms] = useState(["SPY", "QQQ", "AAPL"]);
+  const [cmpSyms, setCmpSyms] = useState(() => {
+    try { const v = JSON.parse(localStorage.getItem("fsc.cmpSyms")); return Array.isArray(v) && v.length ? v : ["SPY", "QQQ", "AAPL"]; }
+    catch { return ["SPY", "QQQ", "AAPL"]; }
+  });
   const [cmpInput, setCmpInput] = useState("");
   const [cmpRange, setCmpRange] = useState("1y");
   const [cmpData, setCmpData] = useState({});
@@ -449,6 +452,7 @@ export default function App() {
   }, [cmpSyms, cmpRange, fetchCandles]);
 
   useEffect(() => { if (tab === "compare") loadCompare(); }, [tab, cmpRange, cmpSyms]);
+  useEffect(() => { localStorage.setItem("fsc.cmpSyms", JSON.stringify(cmpSyms)); }, [cmpSyms]);
 
   const fetchOrders = useCallback(async () => {
     const res = await fetch(`${API_BASE}/orders`);
