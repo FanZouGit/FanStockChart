@@ -761,7 +761,7 @@ export default function App() {
             <button onClick={() => { if (cmpInput && !cmpSyms.includes(cmpInput) && cmpSyms.length < 8) { setCmpSyms(p => [...p, cmpInput]); setCmpInput(""); } }}
               style={{ fontSize: 11, padding: "4px 10px", border: "1px solid #ddd", borderRadius: 6, background: "#f5f5f5", cursor: "pointer" }}>+ Add</button>
             <span style={{ width: 1, height: 16, background: "#e0e0e0" }} />
-            {["3mo","6mo","1y","2y"].map(r => (
+            {["1d","5d","3mo","6mo","1y","2y"].map(r => (
               <button key={r} onClick={() => { setCmpRange(r); setCmpData({}); }}
                 style={{ fontSize: 10, padding: "3px 8px", border: "1px solid #ddd", borderRadius: 6, background: cmpRange === r ? "#f0f0f0" : "transparent", color: cmpRange === r ? "#222" : "#888", cursor: "pointer" }}>{r.toUpperCase()}</button>
             ))}
