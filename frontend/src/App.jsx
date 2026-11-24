@@ -37,6 +37,18 @@ function calcEMA(data, p) {
   return out;
 }
 
+function calcSMA(data, p) {
+  const out = new Array(data.length).fill(null);
+  for (let i = p - 1; i < data.length; i++) {
+    let sum = 0, ok = true;
+    for (let j = i - p + 1; j <= i; j++) { if (data[j] == null) { ok = false; break; } sum += data[j]; }
+    if (ok) out[i] = sum / p;
+  }
+  return out;
+}
+
+const MA_LINES = [{ p: 5, color: "#E24B8A" }, { p: 10, color: "#7F5AF0" }, { p: 20, color: "#1FA2B8" }];
+
 function calcMACD(data, f = 12, s = 26, sig = 9) {
   const ef = calcEMA(data, f), es = calcEMA(data, s);
   const line = data.map((_, i) => ef[i] != null && es[i] != null ? ef[i] - es[i] : null);
@@ -200,6 +212,17 @@ function CandleCanvas({ candles, indicators, patterns, onHover, onCandleClick, b
       ctx.beginPath(); let s = false;
       for (let i = 0; i < n; i++) { if (e20[i] == null) continue; if (!s) { ctx.moveTo(xo(i), yo(e20[i])); s = true; } else ctx.lineTo(xo(i), yo(e20[i])); }
       ctx.strokeStyle = "#EF9F27"; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+
+    if (indicators.ma) {
+      MA_LINES.forEach(({ p, color }) => {
+        const m = calcSMA(closes, p);
+        ctx.beginPath(); let st = false;
+        for (let i = 0; i < n; i++) { if (m[i] == null) continue; if (!st) { ctx.moveTo(xo(i), yo(m[i])); st = true; } else ctx.lineTo(xo(i), yo(m[i])); }
+        ctx.strokeStyle = color; ctx.lineWidth = 1.2; ctx.stroke();
+      });
+      ctx.font = "9px sans-serif"; ctx.textAlign = "left";
+      MA_LINES.forEach(({ p, color }, k) => { ctx.fillStyle = color; ctx.fillText(`MA${p}`, PL + 6 + k * 36, PT + 10); });
     }
 
     if (indicators.pat && patterns) {
@@ -370,7 +393,7 @@ export default function App() {
   const [candles, setCandles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Enter symbol and click Load");
-  const [indicators, setIndicators] = useState({ ema: true, bb: false, vol: true, rsi: true, macd: true, pat: true });
+  const [indicators, setIndicators] = useState({ ema: true, ma: true, bb: false, vol: true, rsi: true, macd: true, pat: true });
   const [patterns, setPatterns] = useState([]);
   const [hoverCandle, setHoverCandle] = useState(null);
   const [alerts, setAlerts] = useState([]);
@@ -528,7 +551,7 @@ export default function App() {
                 style={{ fontSize: 10, padding: "3px 8px", border: "1px solid #ddd", borderRadius: 6, background: range === r ? "#f0f0f0" : "transparent", color: range === r ? "#222" : "#888", cursor: "pointer" }}>{r.toUpperCase()}</button>
             ))}
             <span style={{ width: 1, height: 16, background: "#ddd", margin: "0 2px" }} />
-            {Object.entries({ ema: "EMA", bb: "BB", vol: "Vol", rsi: "RSI", macd: "MACD", pat: "Patterns" }).map(([k, label]) => (
+            {Object.entries({ ema: "EMA", ma: "MA 5/10/20", bb: "BB", vol: "Vol", rsi: "RSI", macd: "MACD", pat: "Patterns" }).map(([k, label]) => (
               <button key={k} onClick={() => setIndicators(prev => ({ ...prev, [k]: !prev[k] }))}
                 style={{ fontSize: 9, padding: "3px 6px", border: "1px solid #ddd", borderRadius: 6, background: indicators[k] ? "#e8f4fd" : "transparent", color: indicators[k] ? "#185FA5" : "#aaa", cursor: "pointer" }}>{label}</button>
             ))}
